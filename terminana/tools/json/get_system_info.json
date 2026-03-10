@@ -1,0 +1,16 @@
+{
+  "name": "get_system_info",
+  "description": "Get current system information including OS, Python version, time.",
+  "module": "ai_skills.core.system_tools",
+  "function": "get_system_info",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "sections": {
+        "type": "string",
+        "description": "Which info sections to include: 'all', 'os', 'python', 'time'. Default 'all'.",
+        "default": "all"
+      }
+    }
+  }
+}

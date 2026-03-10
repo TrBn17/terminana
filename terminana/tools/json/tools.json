@@ -1,0 +1,90 @@
+[
+  {
+    "name": "calculate",
+    "description": "Safely evaluate a math expression and return the result.",
+    "module": "ai_skills.core.system_tools",
+    "function": "evaluate_expression",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "expression": {
+          "type": "string",
+          "description": "A mathematical expression to evaluate, e.g. '2 ** 10 + 5 * 3'."
+        }
+      },
+      "required": [
+        "expression"
+      ]
+    }
+  },
+  {
+    "name": "get_system_info",
+    "description": "Get current system information including OS, Python version, time.",
+    "module": "ai_skills.core.system_tools",
+    "function": "get_system_info",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "sections": {
+          "type": "string",
+          "description": "Which info sections to include: 'all', 'os', 'python', 'time'. Default 'all'.",
+          "default": "all"
+        }
+      }
+    }
+  },
+  {
+    "name": "run_command",
+    "description": "Run a shell command on the host machine using pexpect and return the full captured output.",
+    "module": "ai_skills.core.pexpect_tools",
+    "function": "run_command",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "command": {
+          "type": "string",
+          "description": "The shell command to execute, e.g. 'dir' or 'python --version'."
+        },
+        "timeout": {
+          "type": "integer",
+          "description": "Maximum seconds to wait for the command to finish. Default 30.",
+          "default": 30
+        }
+      },
+      "required": [
+        "command"
+      ]
+    }
+  },
+  {
+    "name": "spawn_and_interact",
+    "description": "Spawn an interactive process and perform scripted expect/send conversation steps.",
+    "module": "ai_skills.core.pexpect_tools",
+    "function": "spawn_and_interact",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "command": {
+          "type": "string",
+          "description": "The executable or command to spawn."
+        },
+        "interactions": {
+          "type": "array",
+          "description": "Ordered list of interaction steps. Each step has optional 'expect' (pattern to wait for) and 'send' (text to type after match).",
+          "items": {
+            "type": "object"
+          }
+        },
+        "timeout": {
+          "type": "integer",
+          "description": "Per-step timeout in seconds. Default 30.",
+          "default": 30
+        }
+      },
+      "required": [
+        "command",
+        "interactions"
+      ]
+    }
+  }
+]

@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "terminana"
+version = "0.1.2"
+description = "Terminal + Telegram AI chat — Gemini & OpenAI with local tools"
+requires-python = ">=3.11"
+dependencies = [
+    "google-genai>=1.0.0",
+    "openai>=1.0.0",
+    "pyfiglet>=1.0.0",
+    "pexpect>=4.9.0",
+    "python-dotenv>=1.0.0",
+    "pywinpty>=2.0.0; sys_platform == 'win32'",
+    "rich>=13.0.0",
+    "prompt_toolkit>=3.0.0",
+    "questionary>=2.0.0",
+    "python-telegram-bot>=21.0.0",
+]
+
+[project.scripts]
+# pip install -e .  →  terminana start
+terminana = "ai_skills.cli:cli"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["ai_skills*"]
+
+[tool.setuptools.package-data]
+"ai_skills" = ["tools/json/*.json"]

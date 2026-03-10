@@ -1,0 +1,31 @@
+{
+  "name": "spawn_and_interact",
+  "description": "Spawn an interactive process and perform scripted expect/send conversation steps.",
+  "module": "ai_skills.core.pexpect_tools",
+  "function": "spawn_and_interact",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "command": {
+        "type": "string",
+        "description": "The executable or command to spawn."
+      },
+      "interactions": {
+        "type": "array",
+        "description": "Ordered list of interaction steps. Each step has optional 'expect' (pattern to wait for) and 'send' (text to type after match).",
+        "items": {
+          "type": "object"
+        }
+      },
+      "timeout": {
+        "type": "integer",
+        "description": "Per-step timeout in seconds. Default 30.",
+        "default": 30
+      }
+    },
+    "required": [
+      "command",
+      "interactions"
+    ]
+  }
+}

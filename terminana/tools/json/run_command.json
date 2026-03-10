@@ -1,0 +1,23 @@
+{
+  "name": "run_command",
+  "description": "Run a shell command on the host machine using pexpect and return the full captured output.",
+  "module": "ai_skills.core.pexpect_tools",
+  "function": "run_command",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "command": {
+        "type": "string",
+        "description": "The shell command to execute, e.g. 'dir' or 'python --version'."
+      },
+      "timeout": {
+        "type": "integer",
+        "description": "Maximum seconds to wait for the command to finish. Default 30.",
+        "default": 30
+      }
+    },
+    "required": [
+      "command"
+    ]
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "name": "calculate",
+  "description": "Safely evaluate a math expression and return the result.",
+  "module": "ai_skills.core.system_tools",
+  "function": "evaluate_expression",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "expression": {
+        "type": "string",
+        "description": "A mathematical expression to evaluate, e.g. '2 ** 10 + 5 * 3'."
+      }
+    },
+    "required": [
+      "expression"
+    ]
+  }
+}
