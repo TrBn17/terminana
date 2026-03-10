@@ -1,6 +1,6 @@
 ﻿<div align="center">
 
-[![Header](https://capsule-render.vercel.app/api?type=waving&color=0:0f0c29,50:302b63,100:24243e&height=220&section=header&text=Terminana&fontSize=62&fontColor=ffffff&animation=fadeIn&fontAlignY=38&desc=Terminal%20%2B%20Telegram%20AI%20Chat%20%E2%80%94%20Gemini%20%26%20OpenAI%20with%20Local%20Tools&descAlignY=58&descAlign=50&descSize=16&descColor=c9d1d9)](https://github.com/)
+<img src="assets/terminana-banner.svg" alt="Terminana startup banner" width="780"/>
 
 <br/>
 
