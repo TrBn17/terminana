@@ -315,23 +315,6 @@ defs = get_tool_definitions(enabled=["calculate", "run_command"])
 
 ---
 
-## 🚢 Publish
-
-```bash
-# Sửa version trong pyproject.toml, rồi:
-python -m build
-twine upload dist/terminana-X.Y.Z*
-```
-
-Đặt token vào `~/.pypirc` để khỏi nhập lại:
-```ini
-[pypi]
-username = __token__
-password = pypi-YOUR_TOKEN_HERE
-```
-
----
-
 <div align="center">
 
 [![Footer](https://capsule-render.vercel.app/api?type=waving&color=0:24243e,50:302b63,100:0f0c29&height=120&section=footer&text=Happy%20Hacking%20%F0%9F%9A%80&fontSize=20&fontColor=c9d1d9&animation=fadeIn&fontAlignY=65)](https://github.com/)
