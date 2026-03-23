@@ -34,6 +34,7 @@ pip install terminana && terminana start
 ### 🤖 Đa provider AI
 - **Google Gemini** (gemini-2.0-flash, ...)
 - **OpenAI** (gpt-4o, gpt-4-turbo, ...)
+- **ChatGPT OAuth** cho OpenAI/Codex-style login
 - Chuyển đổi liền mạch ngay trong phiên chat
 
 </td>
@@ -147,9 +148,22 @@ terminana help        # ❓ Trợ giúp
 GEMINI_API_KEY=AIza...
 OPENAI_API_KEY=sk-...
 TELEGRAM_BOT_TOKEN=...   # chỉ cần nếu dùng Telegram
+
+# OpenAI OAuth / ChatGPT login (tuỳ chỉnh nâng cao, có default sẵn)
+OPENAI_OAUTH_CLIENT_ID=app_EMoamEEZ73f0CkXaXp7hrann
+OPENAI_OAUTH_BASE_URL=https://chatgpt.com/backend-api/codex
+OPENAI_OAUTH_REDIRECT_PORT=1455
+OPENAI_OAUTH_REDIRECT_URI=http://localhost:1455/auth/callback
+OPENAI_OAUTH_MODELS=gpt-5.4,gpt-5.3-codex,codex-mini-latest
+OPENAI_OAUTH_REFRESH_SKEW_SECONDS=60
+OPENAI_OAUTH_STATE_FILE=~/.terminana/auth.json
 ```
 
 > Nếu thiếu key, Terminana sẽ **hỏi khi khởi động** và cho phép lưu vào `.env`.
+
+> Với OpenAI, bạn cũng có thể chọn **đăng nhập ChatGPT OAuth** ngay trong bước setup, không bắt buộc phải nhập `OPENAI_API_KEY`.
+
+> Phiên OAuth được lưu cục bộ tại `~/.terminana/auth.json` để tái sử dụng ở lần chạy sau.
 
 ---
 
@@ -318,7 +332,4 @@ defs = get_tool_definitions(enabled=["calculate", "run_command"])
 <div align="center">
 
 [![Footer](https://capsule-render.vercel.app/api?type=waving&color=0:24243e,50:302b63,100:0f0c29&height=120&section=footer&text=Happy%20Hacking%20%F0%9F%9A%80&fontSize=20&fontColor=c9d1d9&animation=fadeIn&fontAlignY=65)](https://github.com/)
-
-**Made with ❤️ — Terminal meets AI**
-
 </div>

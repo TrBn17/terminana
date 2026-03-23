@@ -1,12 +1,12 @@
 """
 ai_skills/chat/telegram.py
 ──────────────────────────
-Telegram bot runner cho Terminana.
+Trình chạy bot Telegram cho Terminana.
 
 Public API
 ──────────
 get_token() -> str
-run(token, provider, api_key, model)
+run(token, provider, auth, model)
 """
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ import asyncio
 import getpass
 import os
 from pathlib import Path
+from typing import Any
 
 from rich.console import Console
 
@@ -24,7 +25,7 @@ _ENV     = Path(__file__).resolve().parent.parent.parent / ".env"
 
 
 def get_token() -> str:
-    """Lấy Telegram Bot Token từ env hoặc prompt người dùng."""
+    """Lấy Telegram Bot Token từ biến môi trường hoặc hỏi người dùng."""
     from dotenv import load_dotenv
     load_dotenv(_ENV)
     token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
@@ -39,8 +40,8 @@ def get_token() -> str:
     return token
 
 
-def run(token: str, provider: str, api_key: str, model: str, enabled_tools: list[str] | None = None) -> None:
-    """Khởi chạy Telegram bot, block cho đến khi Ctrl+C."""
+def run(token: str, provider: str, auth: Any, model: str, enabled_tools: list[str] | None = None) -> None:
+    """Khởi chạy bot Telegram và chạy cho đến khi nhấn Ctrl+C."""
     from telegram import Update
     from telegram.ext import (
         ApplicationBuilder,
@@ -54,20 +55,20 @@ def run(token: str, provider: str, api_key: str, model: str, enabled_tools: list
 
     def _get_ask(uid: int):
         if uid not in _sessions:
-            _sessions[uid] = new_session(provider, api_key, model, enabled_tools=enabled_tools)
+            _sessions[uid] = new_session(provider, auth, model, enabled_tools=enabled_tools)
         return _sessions[uid]
 
     async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         uid = update.effective_user.id
         _sessions.pop(uid, None)
         await update.message.reply_text(
-            f"Terminana sẵn sàng.\nProvider: {provider.upper()}  |  Model: {model}\n"
+            f"Terminana đã sẵn sàng.\nNhà cung cấp: {provider.upper()}  |  Mô hình: {model}\n"
             "/reset để bắt đầu cuộc trò chuyện mới."
         )
 
     async def cmd_reset(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         _sessions.pop(update.effective_user.id, None)
-        await update.message.reply_text("Session đã được reset.")
+        await update.message.reply_text("Đã đặt lại phiên trò chuyện.")
 
     async def on_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         uid      = update.effective_user.id

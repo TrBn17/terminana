@@ -1,23 +1,24 @@
 """
 ai_skills/chat/session.py
 ─────────────────────────
-Session factory: tạo ask-function cho một cuộc trò chuyện.
-Không phụ thuộc vào UI (terminal hay Telegram dùng chung).
+Hàm tạo phiên trò chuyện.
+Không phụ thuộc vào giao diện, nên có thể dùng chung cho terminal và Telegram.
 
 Public API
 ──────────
-new_session(provider, api_key, model, on_tool) -> Callable[[str], str]
+ new_session(provider, auth, model, on_tool) -> Callable[[str], str]
 """
 from __future__ import annotations
 
 import json
 from typing import Any, Callable
 
+from terminana.config.settings import OPENAI_OAUTH_BASE_URL
 from terminana.tools import get_tool_definitions, execute_tool
 
 SYSTEM_PROMPT = (
     "Bạn là Terminana, trợ lý AI chạy trực tiếp trên máy tính của người dùng. "
-    "Bạn có đầy đủ tools để tương tác với hệ thống cục bộ — hãy dùng chúng, "
+    "Bạn có đầy đủ công cụ để tương tác với hệ thống cục bộ — hãy dùng chúng, "
     "đừng bao giờ nói rằng bạn không thể truy cập file hay hệ thống."
 )
 
@@ -81,7 +82,7 @@ def _gemini_session(
 
 # ── OpenAI ────────────────────────────────────────────────────────────────
 def _openai_session(
-    api_key: str,
+    auth: Any,
     model: str,
     on_tool: Callable | None,
     enabled_tools: list[str] | None,
@@ -96,7 +97,63 @@ def _openai_session(
         }}
         for t in get_tool_definitions(enabled_tools)
     ]
-    client  = OpenAI(api_key=api_key)
+
+    if isinstance(auth, dict) and auth.get("type") == "openai_oauth":
+        headers: dict[str, str] = {}
+        account_id = str(auth.get("account_id", "")).strip()
+        if account_id:
+            headers["ChatGPT-Account-Id"] = account_id
+        client = OpenAI(
+            api_key=str(auth["access_token"]),
+            base_url=OPENAI_OAUTH_BASE_URL,
+            default_headers=headers,
+        )
+        previous_response_id: str | None = None
+
+        def ask(prompt: str) -> str:
+            nonlocal previous_response_id
+
+            pending_input: Any = [{
+                "role": "user",
+                "content": [{"type": "input_text", "text": prompt}],
+            }]
+            while True:
+                req: dict[str, Any] = {
+                    "model": model,
+                    "input": pending_input,
+                    "tools": tools,
+                    "store": False,
+                }
+                if previous_response_id is None:
+                    req["instructions"] = SYSTEM_PROMPT
+                else:
+                    req["previous_response_id"] = previous_response_id
+
+                resp = client.responses.create(**req)
+                previous_response_id = resp.id
+
+                calls = [item for item in resp.output if getattr(item, "type", None) == "function_call"]
+                if not calls:
+                    text = getattr(resp, "output_text", None)
+                    if text:
+                        return text
+                    raise RuntimeError("OpenAI OAuth không trả về nội dung văn bản hợp lệ.")
+
+                pending_input = []
+                for tc in calls:
+                    info = f"[tool] {tc.name}({tc.arguments})"
+                    if on_tool:
+                        on_tool(info)
+                    result = execute_tool(tc.name, json.loads(tc.arguments))
+                    pending_input.append({
+                        "type": "function_call_output",
+                        "call_id": tc.call_id,
+                        "output": json.dumps(result, ensure_ascii=False),
+                    })
+
+        return ask
+
+    client  = OpenAI(api_key=str(auth))
     history = [{"role": "system", "content": SYSTEM_PROMPT}]
 
     def ask(prompt: str) -> str:
@@ -125,24 +182,24 @@ def _openai_session(
 # ── Factory ───────────────────────────────────────────────────────────────
 def new_session(
     provider: str,
-    api_key: str,
+    auth: Any,
     model: str,
     on_tool: Callable[[str], None] | None = None,
     enabled_tools: list[str] | None = None,
 ) -> Callable[[str], str]:
     """
-    Tạo ask-function cho một session.
+    Tạo hàm `ask` cho một phiên trò chuyện.
 
     Parameters
     ----------
     provider      : "gemini" hoặc "openai"
-    api_key       : API key tương ứng
-    model         : tên model
-    on_tool       : callback(info_str) mỗi khi AI gọi tool
-    enabled_tools : danh sách tên tools được phép dùng. None = tất cả.
+    auth          : API key hoặc access token OAuth tương ứng
+    model         : tên mô hình
+    on_tool       : hàm callback(info_str) được gọi khi AI dùng công cụ
+    enabled_tools : danh sách tên công cụ được phép dùng. `None` nghĩa là dùng tất cả.
     """
     if provider == "gemini":
-        return _gemini_session(api_key, model, on_tool, enabled_tools)
+        return _gemini_session(str(auth), model, on_tool, enabled_tools)
     if provider == "openai":
-        return _openai_session(api_key, model, on_tool, enabled_tools)
+        return _openai_session(auth, model, on_tool, enabled_tools)
     raise ValueError(f"Provider không hỗ trợ: {provider!r}")

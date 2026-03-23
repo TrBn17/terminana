@@ -22,11 +22,11 @@ dependencies = [
 
 [project.scripts]
 # pip install -e .  →  terminana start
-terminana = "ai_skills.cli:cli"
+terminana = "terminana.cli:cli"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["ai_skills*"]
+include = ["terminana*"]
 
 [tool.setuptools.package-data]
-"ai_skills" = ["tools/json/*.json"]
+"terminana" = ["tools/json/*.json"]

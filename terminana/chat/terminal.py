@@ -1,7 +1,7 @@
 """
 ai_skills/chat/terminal.py
 ──────────────────────────
-Terminal UI: banner 3-D và chat loop.
+Giao diện terminal: banner 3D và vòng lặp trò chuyện.
 
 Public API
 ──────────
@@ -11,8 +11,8 @@ chat_loop(ask, provider, model, restart, reset)
 Các lệnh trong chat loop
 ─────────────────────────
 /help    — hiện danh sách lệnh
-/switch  — đổi provider và model (chạy lại setup)
-/reset   — bắt đầu cuộc trò chuyện mới, giữ nguyên provider/model
+/switch  — đổi nhà cung cấp và mô hình (chạy lại thiết lập)
+/reset   — bắt đầu cuộc trò chuyện mới, giữ nguyên nhà cung cấp và mô hình
 /clear   — xoá màn hình
 /quit    — thoát
 """
@@ -35,8 +35,8 @@ console = Console()
 # (lệnh, mô tả ngắn)
 _COMMANDS: list[tuple[str, str]] = [
     ("/help",   "Hiển thị danh sách lệnh này"),
-    ("/switch", "Đổi provider và model (chạy lại setup đầy đủ)"),
-    ("/reset",  "Bắt đầu lại cuộc trò chuyện mới, giữ provider/model hiện tại"),
+    ("/switch", "Đổi nhà cung cấp và mô hình (chạy lại thiết lập đầy đủ)"),
+    ("/reset",  "Bắt đầu cuộc trò chuyện mới, giữ nguyên cấu hình hiện tại"),
     ("/clear",  "Xoá màn hình terminal"),
     ("/quit",   "Thoát Terminana  (hoặc dùng Ctrl+C)"),
 ]
@@ -74,7 +74,7 @@ def _print_help(provider: str, model: str) -> None:
     console.print()
     console.print(tbl)
     console.print(
-        f"  Đang dùng: [bold]{provider.upper()}[/] / [bold]{model}[/]\n"
+        f"  Đang sử dụng: [bold]{provider.upper()}[/] / [bold]{model}[/]\n"
     )
 
 
@@ -92,17 +92,17 @@ def chat_loop(
     Parameters
     ----------
     ask      : hàm nhận prompt -> trả lời
-    provider : tên provider hiện tại (chỉ hiển thị)
-    model    : tên model hiện tại (chỉ hiển thị)
+    provider : tên nhà cung cấp hiện tại (chỉ để hiển thị)
+    model    : tên mô hình hiện tại (chỉ để hiển thị)
     restart  : callable() -> (new_ask, new_provider, new_model)
-               Dùng cho /switch — chạy lại setup đầy đủ.
+               Dùng cho /switch — chạy lại thiết lập đầy đủ.
     reset    : callable() -> new_ask
-               Dùng cho /reset — tạo session mới, giữ provider/model.
+               Dùng cho /reset — tạo phiên trò chuyện mới, giữ nguyên cấu hình.
     """
     while True:
         try:
             prompt_label = f"[{provider}/{model}]" if provider and model else ""
-            user = input(f"you{prompt_label}> ").strip()
+            user = input(f"bạn{prompt_label}> ").strip()
         except (KeyboardInterrupt, EOFError):
             break
 
@@ -137,7 +137,7 @@ def chat_loop(
                 console.print("  [red]Không hỗ trợ reset trong chế độ này.[/]")
                 continue
             ask = reset()
-            console.print(f"  [dim]> Session mới: {provider.upper()} / {model}[/]\n")
+            console.print(f"  [dim]> Đã tạo phiên trò chuyện mới: {provider.upper()} / {model}[/]\n")
             continue
 
         if cmd.startswith("/"):
@@ -147,7 +147,7 @@ def chat_loop(
             )
             continue
 
-        with Live(Spinner("dots", text="[cyan]thinking...[/]"),
+        with Live(Spinner("dots", text="[cyan]Đang suy nghĩ...[/]"),
                   console=console, transient=True):
             reply = ask(user)
 

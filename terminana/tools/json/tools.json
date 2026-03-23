@@ -1,8 +1,8 @@
 [
   {
     "name": "calculate",
-    "description": "Safely evaluate a math expression and return the result.",
-    "module": "ai_skills.core.system_tools",
+    "description": "Safely evaluate a basic arithmetic expression.",
+    "module": "terminana.core.system_tools",
     "function": "evaluate_expression",
     "parameters": {
       "type": "object",
@@ -19,8 +19,8 @@
   },
   {
     "name": "get_system_info",
-    "description": "Get current system information including OS, Python version, time.",
-    "module": "ai_skills.core.system_tools",
+    "description": "Get current system information for the requested section.",
+    "module": "terminana.core.system_tools",
     "function": "get_system_info",
     "parameters": {
       "type": "object",
@@ -35,8 +35,8 @@
   },
   {
     "name": "run_command",
-    "description": "Run a shell command on the host machine using pexpect and return the full captured output.",
-    "module": "ai_skills.core.pexpect_tools",
+    "description": "Run a shell command and return the captured output.",
+    "module": "terminana.core.pexpect_tools",
     "function": "run_command",
     "parameters": {
       "type": "object",
@@ -58,8 +58,8 @@
   },
   {
     "name": "spawn_and_interact",
-    "description": "Spawn an interactive process and perform scripted expect/send conversation steps.",
-    "module": "ai_skills.core.pexpect_tools",
+    "description": "Spawn a process and execute ordered expect/send interaction steps.",
+    "module": "terminana.core.pexpect_tools",
     "function": "spawn_and_interact",
     "parameters": {
       "type": "object",

@@ -1,142 +1,143 @@
-"""
-Reusable pexpect-based tools designed for AI function-calling.
-
-Sử dụng đúng API pexpect:
-─────────────────────────
-* pexpect.spawn          – dùng PTY thật (Linux/macOS)
-* pexpect.popen_spawn.PopenSpawn – dùng subprocess.Popen (Windows, không cần PTY)
-  Cả hai đều hỗ trợ cùng bộ API cốt lõi:
-    child.expect(pattern | list)     → trả về index pattern khớp
-    child.sendline(text)             → gửi text + \\n
-    child.send(text)                 → gửi text không có \\n
-    child.before                     → output TRƯỚC khi pattern khớp
-    child.after                      → phần output ĐÃ KHỚP với pattern
-    pexpect.EOF                      → sentinel – process kết thúc
-    pexpect.TIMEOUT                  → sentinel – hết timeout
-
-Public API
-──────────
-run_command(command, timeout)
-    Chạy lệnh và thu thập output từng dòng qua vòng loop expect.
-
-spawn_and_interact(command, interactions, timeout)
-    Spawn process tương tác và đi qua chuỗi expect/sendline.
-    Mỗi bước dùng expect([pattern, EOF, TIMEOUT]) để xử lý mọi tình huống.
-
-TOOL_DEFINITIONS   – Gemini function declarations
-execute_tool(name, args) – dispatcher
-"""
+"""pexpect-backed tools for command execution and scripted interactions."""
 
 from __future__ import annotations
 
-import sys
-import re
 import io
+import re
+import sys
 from typing import Any
 
 import pexpect
-from pexpect import EOF, TIMEOUT  # sentinel objects của pexpect
+from pexpect import EOF, TIMEOUT
 
 from terminana.tools.decorator import tool
 
-# ── Platform-aware child factory ──────────────────────────────────────────
-if sys.platform == "win32":
+_IS_WIN = sys.platform == "win32"
+_ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*[mGKHF]|\x1b\].*?\x07|\x1b[@-Z\\-_]")
+_WINDOWS_SHELL_BUILTINS = {
+    "cls",
+    "copy",
+    "del",
+    "dir",
+    "echo",
+    "md",
+    "move",
+    "popd",
+    "pushd",
+    "rd",
+    "ren",
+    "set",
+    "type",
+}
+_TAIL_TIMEOUT_SECONDS = 1
+
+if _IS_WIN:
     from pexpect.popen_spawn import PopenSpawn as _PopenSpawn
-    _IS_WIN = True
-else:
-    _IS_WIN = False
 
 
 def _strip_ansi(text: str) -> str:
-    """Loại bỏ ANSI/VT100 escape sequences."""
-    return re.sub(r"\x1b\[[0-9;]*[mGKHF]|\x1b\].*?\x07|\x1b[@-Z\\-_]", "", text)
+    """Remove ANSI escape sequences from captured output."""
+    return _ANSI_ESCAPE_RE.sub("", text)
+
+
+def _clean_output(text: str | None) -> str:
+    return _strip_ansi(text or "").strip()
+
+
+def _normalize_command(command: str) -> str:
+    """Wrap Windows shell built-ins so PopenSpawn can execute them reliably."""
+    if not _IS_WIN:
+        return command
+
+    stripped = command.strip()
+    if not stripped:
+        return command
+
+    first_token = stripped.split(maxsplit=1)[0].lower()
+    if first_token in _WINDOWS_SHELL_BUILTINS:
+        return f"cmd /c {command}"
+    return command
 
 
 def _make_child(command: str, timeout: int, log: io.StringIO | None = None):
-    """
-    Tạo pexpect child phù hợp với platform.
+    """Create a platform-appropriate pexpect child process."""
+    normalized_command = _normalize_command(command)
 
-    - Windows: PopenSpawn (không dùng PTY, dùng subprocess.Popen)
-    - Unix:    pexpect.spawn với /bin/bash -c (dùng PTY thật)
-
-    Cả hai đều có chung API: expect(), sendline(), send(), before, after.
-    """
     if _IS_WIN:
-        child = _PopenSpawn(command, timeout=timeout, encoding="utf-8")
+        child = _PopenSpawn(normalized_command, timeout=timeout, encoding="utf-8")
         if log is not None:
-            child.logfile = log        # PopenSpawn: ghi tất cả I/O vào log
-    else:
-        child = pexpect.spawn(
-            "/bin/bash", args=["-c", command],
-            timeout=timeout, encoding="utf-8",
-        )
-        if log is not None:
-            child.logfile_read = log   # spawn: chỉ ghi output từ child
+            child.logfile = log
+        return child
+
+    child = pexpect.spawn(
+        "/bin/bash",
+        args=["-c", normalized_command],
+        timeout=timeout,
+        encoding="utf-8",
+    )
+    if log is not None:
+        child.logfile_read = log
     return child
 
 
-# ─────────────────────────────────────────────────────────────────────────
-# Tool 1 – run_command
-#   Dùng vòng loop expect(['\n', EOF, TIMEOUT]) để thu từng dòng output,
-#   thay vì chỉ gọi expect(EOF) một lần → đây là cách pexpect đề xuất để
-#   streaming output.
-# ─────────────────────────────────────────────────────────────────────────
+def _close_child(child: Any) -> None:
+    try:
+        child.close(force=True)
+    except TypeError:
+        child.close()
+    except Exception:
+        pass
+
+
+def _build_failure(
+    command: str,
+    error: str,
+    *,
+    partial_output: str | None = None,
+    transcript: list[str] | None = None,
+    full_log: str | None = None,
+) -> dict[str, Any]:
+    result: dict[str, Any] = {
+        "success": False,
+        "command": command,
+        "error": error,
+    }
+    if partial_output is not None:
+        result["partial_output"] = partial_output
+    if transcript is not None:
+        result["transcript"] = transcript
+    if full_log is not None:
+        result["full_log"] = full_log
+    return result
+
 
 @tool
 def run_command(command: str, timeout: int = 30) -> dict[str, Any]:
-    """Run a shell command on the host machine using pexpect and return the full captured output.
-
-    command : The shell command to execute, e.g. 'dir' or 'python --version'.
-    timeout : Maximum seconds to wait for the command to finish. Default 30.
-    """
-    # Tự động thêm "cmd /c" cho shell built-ins trên Windows
-    _WIN_BUILTINS = {
-        "dir", "echo", "type", "set", "cls", "copy", "del",
-        "move", "ren", "md", "rd", "pushd", "popd",
-    }
-    run_cmd = command
-    if _IS_WIN:
-        first = command.strip().split()[0].lower() if command.strip() else ""
-        if first in _WIN_BUILTINS:
-            run_cmd = f"cmd /c {command}"
-
-    log = io.StringIO()
-    child = _make_child(run_cmd, timeout=timeout, log=log)
-
-    lines: list[str] = []
+    """Run a shell command and return the captured output."""
+    child = None
     try:
-        while True:
-            # expect() trả về INDEX của pattern đầu tiên khớp trong danh sách
-            idx = child.expect([r"\r\n", r"\n", EOF, TIMEOUT])
+        child = _make_child(command, timeout=timeout)
+        idx = child.expect([EOF, TIMEOUT])
+        output = _clean_output(child.before)
 
-            # child.before = text thu được TRƯỚC khi pattern khớp
-            fragment = _strip_ansi(child.before or "")
-            if fragment:
-                lines.append(fragment)
+        if idx == 1:
+            return _build_failure(
+                command,
+                f"Command timed out after {timeout}s.",
+                partial_output=output,
+            )
 
-            if idx == 2:   # EOF – process kết thúc, thoát vòng lặp
-                break
-            if idx == 3:   # TIMEOUT
-                return {
-                    "success": False,
-                    "command": command,
-                    "error": f"Command timed out after {timeout}s.",
-                    "partial_output": "\n".join(lines),
-                }
-
+        return {
+            "success": True,
+            "command": command,
+            "output": output,
+        }
     except Exception as exc:
-        return {"success": False, "command": command, "error": str(exc)}
+        return _build_failure(command, str(exc))
+    finally:
+        if child is not None:
+            _close_child(child)
 
-    return {"success": True, "command": command, "output": "\n".join(lines).strip()}
-
-
-# ─────────────────────────────────────────────────────────────────────────
-# Tool 2 – spawn_and_interact
-#   Dùng expect([user_pattern, EOF, TIMEOUT]) tại mỗi bước để xử lý
-#   cả ba tình huống: khớp đúng / process kết thúc sớm / timeout,
-#   rồi sendline() để phản hồi. Đây là mô hình expect/response cốt lõi
-#   của pexpect.
-# ─────────────────────────────────────────────────────────────────────────
 
 @tool
 def spawn_and_interact(
@@ -144,72 +145,101 @@ def spawn_and_interact(
     interactions: list[dict[str, str]],
     timeout: int = 30,
 ) -> dict[str, Any]:
-    """Spawn an interactive process and perform scripted expect/send conversation steps.
-
-    command      : The executable or command to spawn.
-    interactions : Ordered list of interaction steps. Each step has optional 'expect' (pattern to wait for) and 'send' (text to type after match).
-    timeout      : Per-step timeout in seconds. Default 30.
-    """
+    """Spawn a process and execute ordered expect/send interaction steps."""
+    child = None
     log = io.StringIO()
-    child = _make_child(command, timeout=timeout, log=log)
-    transcript: list[str] = []  # toàn bộ output theo từng bước
+    transcript: list[str] = []
 
     try:
-        for step_no, step in enumerate(interactions, 1):
-            expect_pattern: str | None = step.get("expect")
-            send_text: str | None      = step.get("send")
+        child = _make_child(command, timeout=timeout, log=log)
 
-            if expect_pattern:
-                # ── Dùng expect() với DANH SÁCH pattern ─────────────────
-                # expect() trả về index của pattern đầu tiên khớp.
-                # Luôn thêm EOF và TIMEOUT vào cuối để bắt mọi tình huống.
+        for step_no, step in enumerate(interactions, start=1):
+            if not isinstance(step, dict):
+                return _build_failure(
+                    command,
+                    f"Step {step_no}: interaction must be an object.",
+                    transcript=transcript,
+                    full_log=_clean_output(log.getvalue()),
+                )
+
+            expect_pattern = step.get("expect")
+            send_text = step.get("send")
+
+            if expect_pattern is not None and not isinstance(expect_pattern, str):
+                return _build_failure(
+                    command,
+                    f"Step {step_no}: 'expect' must be a string or null.",
+                    transcript=transcript,
+                    full_log=_clean_output(log.getvalue()),
+                )
+
+            if send_text is not None and not isinstance(send_text, str):
+                return _build_failure(
+                    command,
+                    f"Step {step_no}: 'send' must be a string or null.",
+                    transcript=transcript,
+                    full_log=_clean_output(log.getvalue()),
+                )
+
+            if expect_pattern is not None:
                 idx = child.expect([expect_pattern, EOF, TIMEOUT])
+                before = _clean_output(child.before)
 
-                before = _strip_ansi(child.before or "")
-                after  = _strip_ansi(child.after  or "")  # phần đã khớp
+                if idx == 1:
+                    transcript.append(
+                        f"[step {step_no}] EOF before matching {expect_pattern!r}: {before!r}"
+                    )
+                    full_log = _clean_output(log.getvalue())
+                    return _build_failure(
+                        command,
+                        f"Step {step_no}: process exited before matching {expect_pattern!r}.",
+                        partial_output=full_log or before,
+                        transcript=transcript,
+                        full_log=full_log,
+                    )
 
-                if idx == 0:
-                    # Khớp đúng pattern mong đợi
-                    transcript.append(f"[step {step_no}] matched={repr(after)}  before={repr(before)}")
-                elif idx == 1:
-                    # Process kết thúc bất ngờ trước khi pattern xuất hiện
-                    transcript.append(f"[step {step_no}] EOF before '{expect_pattern}': {before}")
-                    break
-                elif idx == 2:
-                    # Timeout
-                    return {
-                        "success": False,
-                        "command": command,
-                        "error": f"Step {step_no}: timeout waiting for '{expect_pattern}'.",
-                        "partial_output": "\n".join(transcript),
-                    }
+                if idx == 2:
+                    transcript.append(f"[step {step_no}] timeout waiting for {expect_pattern!r}")
+                    full_log = _clean_output(log.getvalue())
+                    return _build_failure(
+                        command,
+                        f"Step {step_no}: timeout waiting for {expect_pattern!r}.",
+                        partial_output=full_log or before,
+                        transcript=transcript,
+                        full_log=full_log,
+                    )
+
+                matched = _clean_output(child.after)
+                transcript.append(
+                    f"[step {step_no}] matched={matched!r} before={before!r}"
+                )
 
             if send_text is not None:
-                # ── sendline() gửi text + newline (\\n) ─────────────────
                 child.sendline(send_text)
-                transcript.append(f"[step {step_no}] sent={repr(send_text)}")
+                transcript.append(f"[step {step_no}] sent={send_text!r}")
 
-        # ── Đọc hết output còn lại sau tất cả các bước ──────────────────
-        try:
-            child.expect(EOF, timeout=10)
-            tail = _strip_ansi(child.before or "").strip()
-            if tail:
-                transcript.append(f"[tail] {tail}")
-        except (TIMEOUT, EOF):
-            pass
+        idx = child.expect([EOF, TIMEOUT], timeout=_TAIL_TIMEOUT_SECONDS)
+        tail = _clean_output(child.before)
+        if tail:
+            transcript.append(f"[tail] {tail}")
+        if idx == 1 and child.isalive():
+            transcript.append("[tail] process still running; closing session")
 
+        return {
+            "success": True,
+            "command": command,
+            "transcript": transcript,
+            "full_log": _clean_output(log.getvalue()),
+        }
     except Exception as exc:
-        return {"success": False, "command": command, "error": str(exc)}
-
-    # Log đầy đủ (tất cả I/O đã ghi vào StringIO)
-    full_log = _strip_ansi(log.getvalue()).strip()
-
-    return {
-        "success": True,
-        "command": command,
-        "transcript": transcript,       # chuỗi bước expect/send có chú thích
-        "full_log": full_log,           # toàn bộ raw I/O qua logfile
-    }
-
-
-# Tool definitions & dispatcher → xem ai_skills.tools
+        full_log = _clean_output(log.getvalue())
+        return _build_failure(
+            command,
+            str(exc),
+            partial_output=full_log or None,
+            transcript=transcript,
+            full_log=full_log,
+        )
+    finally:
+        if child is not None:
+            _close_child(child)

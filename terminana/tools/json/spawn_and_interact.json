@@ -1,7 +1,7 @@
 {
   "name": "spawn_and_interact",
-  "description": "Spawn an interactive process and perform scripted expect/send conversation steps.",
-  "module": "ai_skills.core.pexpect_tools",
+  "description": "Spawn a process and execute ordered expect/send interaction steps.",
+  "module": "terminana.core.pexpect_tools",
   "function": "spawn_and_interact",
   "parameters": {
     "type": "object",

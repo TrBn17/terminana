@@ -1,7 +1,7 @@
 {
   "name": "run_command",
-  "description": "Run a shell command on the host machine using pexpect and return the full captured output.",
-  "module": "ai_skills.core.pexpect_tools",
+  "description": "Run a shell command and return the captured output.",
+  "module": "terminana.core.pexpect_tools",
   "function": "run_command",
   "parameters": {
     "type": "object",

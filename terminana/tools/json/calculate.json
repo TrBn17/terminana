@@ -1,7 +1,7 @@
 {
   "name": "calculate",
-  "description": "Safely evaluate a math expression and return the result.",
-  "module": "ai_skills.core.system_tools",
+  "description": "Safely evaluate a basic arithmetic expression.",
+  "module": "terminana.core.system_tools",
   "function": "evaluate_expression",
   "parameters": {
     "type": "object",
